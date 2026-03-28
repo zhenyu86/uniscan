@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+{% set active_page = 'dashboard' %}
+
+{% block title %}数据分析 - UniScan{% endblock %}
+{% block page_name %}数据分析{% endblock %}
+
+{% block extra_css %}
+<style>
+.dashboard { padding: 0; }
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 24px; }
+.stat-card {
+  background: #fff; border-radius: 12px; padding: 20px; border: 1px solid #E2E8F0;
+  display: flex; align-items: center; gap: 16px;
+}
+.stat-icon {
+  width: 52px; height: 52px; border-radius: 12px; display: flex;
+  align-items: center; justify-content: center; font-size: 22px;
+}
+.stat-icon.blue { background: #DBEAFE; color: #2563EB; }
+.stat-icon.green { background: #D1FAE5; color: #059669; }
+.stat-icon.yellow { background: #FEF3C7; color: #D97706; }
+.stat-icon.red { background: #FEE2E2; color: #DC2626; }
+.stat-icon.purple { background: #E0E7FF; color: #4F46E5; }
+.stat-value { font-size: 28px; font-weight: 700; color: #1E293B; }
+.stat-label { font-size: 13px; color: #64748B; margin-top: 2px; }
+
+.charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+.chart-card {
+  background: #fff; border-radius: 12px; padding: 20px; border: 1px solid #E2E8F0;
+}
+.chart-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: #1E293B; display: flex; justify-content: space-between; align-items: center; }
+.chart-box { height: 280px; }
+
+.time-range { display: flex; gap: 4px; }
+.time-btn {
+  padding: 4px 12px; border: 1px solid #E2E8F0; background: #fff; border-radius: 6px;
+  font-size: 12px; cursor: pointer; color: #64748B;
+}
+.time-btn:hover { border-color: #2D5BFF; color: #2D5BFF; }
+.time-btn.active { background: #2D5BFF; color: #fff; border-color: #2D5BFF; }
+
+.bottom-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.list-card {
+  background: #fff; border-radius: 12px; padding: 20px; border: 1px solid #E2E8F0;
+}
+.list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.list-title { font-size: 16px; font-weight: 600; }
+.list-link { font-size: 13px; color: #2D5BFF; text-decoration: none; }
+
+.alert-item {
+  display: flex; align-items: center; gap: 12px; padding: 12px 0;
+  border-bottom: 1px solid #E2E8F0;
+}
+.alert-item:last-child { border-bottom: none; }
+.alert-badge { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.alert-badge.critical { background: #DC2626; }
+.alert-badge.warning { background: #F59E0B; }
+.alert-badge.info { background: #3B82F6; }
+.alert-content { flex: 1; }
+.alert-text { font-size: 13px; color: #1E293B; }
+.alert-time { font-size: 11px; color: #94A3B8; margin-top: 2px; }
+
+.task-item {
+  display: flex; align-items: center; gap: 12px; padding: 12px 0;
+  border-bottom: 1px solid #E2E8F0;
+}
+.task-item:last-child { border-bottom: none; }
+.task-icon {
+  width: 36px; height: 36px; border-radius: 8px; display: flex;
+  align-items: center; justify-content: center; font-size: 14px;
+}
+.task-icon.image { background: #D1FAE5; color: #059669; }
+.task-icon.video { background: #DBEAFE; color: #2563EB; }
+.task-info { flex: 1; }
+.task-name { font-size: 13px; color: #1E293B; }
+.task-status { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+.task-status.done { background: #D1FAE5; color: #065F46; }
+.task-status.processing { background: #FEF9C3; color: #854D0E; }
+.task-status.queued { background: #F3F4F6; color: #6B7280; }
+.task-status.failed { background: #FEE2E2; color: #991B1B; }
+
+.empty-hint {
+  text-align: center; padding: 40px; color: #94A3B8;
+}
+.empty-hint i { font-size: 32px; margin-bottom: 12px; display: block; opacity: 0.5; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+  <!-- Stats -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon blue"><i class="bi bi-list-task"></i></div>
+      <div>
+        <div class="stat-value" id="stat-tasks">0</div>
+        <div class="stat-label">总任务数</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon green"><i class="bi bi-check-circle"></i></div>
+      <div>
+        <div class="stat-value" id="stat-completed">0</div>
+        <div class="stat-label">已完成</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon yellow"><i class="bi bi-hourglass-split"></i></div>
+      <div>
+        <div class="stat-value" id="stat-processing">0</div>
+        <div class="stat-label">处理中</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon red"><i class="bi bi-exclamation-triangle"></i></div>
+      <div>
+        <div class="stat-value" id="stat-alerts">0</div>
+        <div class="stat-label">告警数</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">
+        检测趋势
+        <div class="time-range">
+          <button class="time-btn active" data-days="7">7天</button>
+          <button class="time-btn" data-days="30">30天</button>
+        </div>
+      </div>
+      <div id="trend-chart" class="chart-box"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">
+        类别分布
+        <select id="task-selector" class="filter-select" style="font-size: 12px; padding: 4px 8px;">
+          <option value="">全部任务</option>
+        </select>
+      </div>
+      <div id="distribution-chart" class="chart-box"></div>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">
+        告警趋势
+        <div class="time-range">
+          <button class="time-btn alert-days-btn active" data-days="7">7天</button>
+          <button class="time-btn alert-days-btn" data-days="30">30天</button>
+        </div>
+      </div>
+      <div id="alert-chart" class="chart-box"></div>
+    </div>
+    <div class="chart-card">
+      <div class="list-header">
+        <div class="list-title">最近任务</div>
+        <a href="/tasks" class="list-link">查看全部</a>
+      </div>
+      <div id="recent-tasks">
+        <div class="empty-hint"><i class="bi bi-inbox"></i>暂无任务</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script>
+(function() {
+  let trendDays = 7;
+
+  // Load stats
+  async function loadStats() {
+    try {
+      const resp = await axios.get('/api/v1/analytics/dashboard');
+      if (resp.data.code === 200) {
+        const d = resp.data.data;
+        document.getElementById('stat-tasks').textContent = d.tasks?.total || 0;
+        document.getElementById('stat-completed').textContent = d.tasks?.completed || 0;
+        document.getElementById('stat-processing').textContent = d.tasks?.processing || 0;
+        document.getElementById('stat-alerts').textContent = d.alerts?.total || 0;
+      }
+    } catch (e) {}
+  }
+
+  // Load recent tasks
+  async function loadRecentTasks() {
+    const container = document.getElementById('recent-tasks');
+    try {
+      const resp = await axios.get('/api/v1/detect/tasks', { params: { page: 1, per_page: 5 } });
+      if (resp.data.code === 200 && resp.data.data.items.length > 0) {
+        let html = '';
+        const statusText = { queued: '排队中', processing: '处理中', completed: '已完成', failed: '失败' };
+        resp.data.data.items.forEach(t => {
+          const icon = t.task_type === 'image' ? 'bi-image' : 'bi-camera-video';
+          const iconClass = t.task_type === 'image' ? 'image' : 'video';
+          html += `<div class="task-item">
+            <div class="task-icon ${iconClass}"><i class="bi ${icon}"></i></div>
+            <div class="task-info"><div class="task-name">任务 #${t.id}</div></div>
+            <span class="task-status ${t.status}">${statusText[t.status] || t.status}</span>
+          </div>`;
+        });
+        container.innerHTML = html;
+      } else {
+        container.innerHTML = '<div class="empty-hint"><i class="bi bi-inbox"></i>暂无任务</div>';
+      }
+    } catch (e) {
+      container.innerHTML = '<div class="empty-hint"><i class="bi bi-inbox"></i>加载失败</div>';
+    }
+  }
+
+  // Load trend chart
+  async function loadTrendChart() {
+    const chart = echarts.init(document.getElementById('trend-chart'));
+    try {
+      const resp = await axios.get('/api/v1/analytics/detection-trend', { params: { days: trendDays } });
+      let dates = [], values = [];
+      if (resp.data.code === 200 && resp.data.data.length > 0) {
+        resp.data.data.forEach(item => { dates.push(item.date); values.push(item.count); });
+      }
+      
+      // 无数据时显示空图表
+      if (dates.length === 0) {
+        chart.setOption({
+          tooltip: { trigger: 'axis' },
+          grid: { left: 40, right: 20, top: 20, bottom: 30 },
+          xAxis: { type: 'category', data: [] },
+          yAxis: { type: 'value' },
+          series: [],
+          graphic: {
+            type: 'text',
+            left: 'center',
+            top: 'middle',
+            style: {
+              text: '暂无检测数据',
+              fontSize: 14,
+              fill: '#94A3B8'
+            }
+          }
+        });
+        return;
+      }
+      
+      chart.setOption({
+        tooltip: { trigger: 'axis' },
+        grid: { left: 40, right: 20, top: 20, bottom: 30 },
+        xAxis: { type: 'category', data: dates, axisLine: { lineStyle: { color: '#E2E8F0' } } },
+        yAxis: { type: 'value', splitLine: { lineStyle: { color: '#F1F5F9' } } },
+        series: [{ type: 'line', data: values, smooth: true, symbol: 'circle', symbolSize: 6,
+          lineStyle: { color: '#2D5BFF', width: 2 }, itemStyle: { color: '#2D5BFF' },
+          areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [
+            { offset: 0, color: 'rgba(45,91,255,0.3)' }, { offset: 1, color: 'rgba(45,91,255,0.02)' }
+          ]}}
+        }]
+      });
+    } catch (e) {}
+  }
+
+  // Load task selector
+  async function loadTaskSelector() {
+    try {
+      const resp = await axios.get('/api/v1/detect/tasks', { params: { status: 'completed', per_page: 50 } });
+      if (resp.data.code === 200) {
+        const tasks = resp.data.data.items;
+        const selector = document.getElementById('task-selector');
+        let html = '<option value="">全部任务</option>';
+        tasks.forEach(t => {
+          const typeText = t.task_type === 'video' ? '视频' : '图片';
+          html += `<option value="${t.id}">${typeText} #${t.id}</option>`;
+        });
+        selector.innerHTML = html;
+      }
+    } catch (e) {}
+  }
+
+  // Load distribution chart
+  let distributionChart = null;
+  async function loadDistributionChart() {
+    if (!distributionChart) {
+      distributionChart = echarts.init(document.getElementById('distribution-chart'));
+    }
+    
+    const selector = document.getElementById('task-selector');
+    
+    // 获取当前选择的任务ID
+    const taskId = selector.value;
+    
+    // 保存选择到 localStorage（只有当选择了具体任务时才保存）
+    if (taskId) {
+      localStorage.setItem('uniscan_selected_task', taskId);
+    } else {
+      localStorage.removeItem('uniscan_selected_task');
+    }
+    
+    const params = { days: 7 };
+    if (taskId) params.task_id = taskId;
+    
+    try {
+      const resp = await axios.get('/api/v1/analytics/class-distribution', { params });
+      let data = [];
+      if (resp.data.code === 200 && resp.data.data.length > 0) {
+        data = resp.data.data;
+      } else {
+        data = [{ name: '暂无数据', value: 1 }];
+      }
+      distributionChart.setOption({
+        tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+        series: [{ type: 'pie', radius: ['40%', '70%'], itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+          label: { show: true, formatter: '{b}\n{d}%' },
+          data: data.map((item, i) => ({ ...item, itemStyle: { color: ['#2D5BFF', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'][i % 5] } }))
+        }]
+      });
+    } catch (e) {}
+  }
+  
+  document.getElementById('task-selector').addEventListener('change', loadDistributionChart);
+
+  // Load alert chart
+  let alertDays = 7;
+  async function loadAlertChart() {
+    const chart = echarts.init(document.getElementById('alert-chart'));
+    try {
+      const resp = await axios.get('/api/v1/analytics/alert-trend', { 
+        params: { 
+          days: alertDays
+        } 
+      });
+      
+      // 检查响应是否有数据
+      if (resp.data.code !== 200 || !resp.data.data || resp.data.data.length === 0) {
+        // 无数据时显示空图表
+        chart.setOption({
+          tooltip: { trigger: 'axis' },
+          grid: { left: 40, right: 20, top: 20, bottom: 40 },
+          xAxis: { type: 'category', data: [] },
+          yAxis: { type: 'value' },
+          series: [],
+          graphic: {
+            type: 'text',
+            left: 'center',
+            top: 'middle',
+            style: {
+              text: '暂无告警数据',
+              fontSize: 14,
+              fill: '#94A3B8'
+            }
+          }
+        });
+        return;
+      }
+      
+      let dates = [], warnings = [], infos = [], errors = [], criticals = [];
+      
+      resp.data.data.forEach(item => {
+        dates.push(item.date);
+        warnings.push(item.warning || 0);
+        infos.push(item.info || 0);
+        errors.push(item.error || 0);
+        criticals.push(item.critical || 0);
+      });
+      
+      chart.setOption({
+        tooltip: { trigger: 'axis' },
+        legend: { data: ['提示', '一般', '重要', '紧急'], bottom: 0 },
+        grid: { left: 40, right: 20, top: 20, bottom: 40 },
+        xAxis: { type: 'category', data: dates },
+        yAxis: { type: 'value' },
+        series: [
+          { name: '提示', type: 'bar', stack: 'alert', data: infos, itemStyle: { color: '#3B82F6' } },
+          { name: '一般', type: 'bar', stack: 'alert', data: warnings, itemStyle: { color: '#F59E0B' } },
+          { name: '重要', type: 'bar', stack: 'alert', data: errors, itemStyle: { color: '#EF4444' } },
+          { name: '紧急', type: 'bar', stack: 'alert', data: criticals, itemStyle: { color: '#DC2626' } }
+        ]
+      });
+    } catch (e) {
+      console.error('Load alert chart error:', e);
+      // 出错时显示空图表
+      chart.setOption({
+        tooltip: { trigger: 'axis' },
+        grid: { left: 40, right: 20, top: 20, bottom: 40 },
+        xAxis: { type: 'category', data: [] },
+        yAxis: { type: 'value' },
+        series: [],
+        graphic: {
+          type: 'text',
+          left: 'center',
+          top: 'middle',
+          style: {
+            text: '加载失败',
+            fontSize: 14,
+            fill: '#94A3B8'
+          }
+        }
+      });
+    }
+  }
+  
+  // Init
+  async function init() {
+    loadStats();
+    loadTrendChart();
+    await loadTaskSelector();  // 等待任务选择器加载完成
+    
+    // 恢复上次选择的任务（如果有且有效）
+    const selector = document.getElementById('task-selector');
+    const savedTaskId = localStorage.getItem('uniscan_selected_task');
+    if (savedTaskId) {
+      // 检查保存的任务ID是否在选项中存在
+      let optionExists = false;
+      for (let i = 0; i < selector.options.length; i++) {
+        if (selector.options[i].value === savedTaskId) {
+          optionExists = true;
+          break;
+        }
+      }
+      
+      if (optionExists) {
+        selector.value = savedTaskId;
+      }
+    }
+    
+    loadDistributionChart();   // 然后再加载分布图
+    loadAlertChart();
+    loadRecentTasks();
+  }
+  init();
+
+  // Auto refresh
+  setInterval(() => { loadStats(); loadRecentTasks(); }, 30000);
+
+  // Resize
+  window.addEventListener('resize', () => {
+    ['trend-chart', 'distribution-chart', 'alert-chart'].forEach(id => {
+      echarts.getInstanceByDom(document.getElementById(id))?.resize();
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}UniScan Detection Platform{% endblock %}</title>
+  {% set active_page = active_page|default('dashboard') %}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.8/dist/axios.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --sidebar-bg: #1A1F2E;
+      --sidebar-width: 240px;
+      --sidebar-collapsed: 64px;
+      --topbar-height: 56px;
+      --content-bg: #F5F7FA;
+      --accent: #2D5BFF;
+      --accent-hover: #1A45D6;
+      --text-primary: #1E293B;
+      --text-secondary: #64748B;
+      --border: #E2E8F0;
+      --white: #FFFFFF;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--content-bg);
+      color: var(--text-primary);
+      min-height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      position: fixed;
+      top: 0; left: 0;
+      width: var(--sidebar-width);
+      height: 100vh;
+      background: var(--sidebar-bg);
+      color: var(--white);
+      z-index: 1000;
+      transition: width 0.3s ease;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .sidebar.collapsed { width: var(--sidebar-collapsed); }
+    .sidebar-brand {
+      height: var(--topbar-height);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
+    .sidebar-brand .logo {
+      width: 28px; height: 28px;
+      background: var(--accent);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 14px;
+      flex-shrink: 0;
+    }
+    .sidebar-brand .brand-text {
+      font-size: 16px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      transition: opacity 0.2s;
+    }
+    .sidebar.collapsed .brand-text { opacity: 0; width: 0; }
+    .sidebar-nav {
+      flex: 1;
+      padding: 12px 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+    .sidebar-nav::-webkit-scrollbar { width: 4px; }
+    .sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+    .nav-section {
+      padding: 8px 20px 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: rgba(255,255,255,0.35);
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .sidebar.collapsed .nav-section { opacity: 0; }
+    .nav-item a {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 20px;
+      color: rgba(255,255,255,0.65);
+      text-decoration: none;
+      font-size: 14px;
+      transition: all 0.2s;
+      white-space: nowrap;
+      border-left: 3px solid transparent;
+    }
+    .nav-item a:hover {
+      background: rgba(255,255,255,0.06);
+      color: var(--white);
+    }
+    .nav-item a.active {
+      background: rgba(45,91,255,0.15);
+      color: var(--accent);
+      border-left-color: var(--accent);
+    }
+    .nav-item a .bi {
+      font-size: 18px;
+      width: 24px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+    .nav-item a .nav-label {
+      overflow: hidden;
+      transition: opacity 0.2s;
+    }
+    .sidebar.collapsed .nav-item a .nav-label { opacity: 0; width: 0; }
+    .sidebar-footer {
+      padding: 12px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      flex-shrink: 0;
+    }
+    .sidebar-footer .btn-collapse {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 8px 8px;
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.5);
+      cursor: pointer;
+      border-radius: 6px;
+      font-size: 14px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .sidebar-footer .btn-collapse:hover {
+      background: rgba(255,255,255,0.06);
+      color: var(--white);
+    }
+    .sidebar.collapsed .sidebar-footer .btn-collapse span { opacity: 0; width: 0; }
+
+    /* Topbar */
+    .topbar {
+      position: fixed;
+      top: 0;
+      left: var(--sidebar-width);
+      right: 0;
+      height: var(--topbar-height);
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 999;
+      transition: left 0.3s ease;
+    }
+    .sidebar.collapsed ~ .topbar { left: var(--sidebar-collapsed); }
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+    .breadcrumb a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .breadcrumb a:hover { color: var(--accent); }
+    .breadcrumb .current { color: var(--text-primary); font-weight: 500; }
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .topbar-btn {
+      width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      border: none;
+      background: none;
+      color: var(--text-secondary);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 18px;
+      position: relative;
+      transition: all 0.2s;
+    }
+    .topbar-btn:hover {
+      background: var(--content-bg);
+      color: var(--text-primary);
+    }
+    .topbar-btn .badge-dot {
+      position: absolute;
+      top: 8px; right: 8px;
+      width: 7px; height: 7px;
+      background: #EF4444;
+      border-radius: 50%;
+      border: 2px solid var(--white);
+    }
+    .topbar-divider {
+      width: 1px; height: 24px;
+      background: var(--border);
+      margin: 0 4px;
+    }
+    .user-menu {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 8px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .user-menu:hover { background: var(--content-bg); }
+    .user-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), #7C3AED);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--white);
+      font-size: 13px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .user-info { line-height: 1.3; }
+    .user-name { font-size: 13px; font-weight: 500; color: var(--text-primary); }
+    .user-role { font-size: 11px; color: var(--text-secondary); }
+
+    /* Main content */
+    .main {
+      margin-left: var(--sidebar-width);
+      margin-top: var(--topbar-height);
+      min-height: calc(100vh - var(--topbar-height));
+      padding: 24px;
+      transition: margin-left 0.3s ease;
+    }
+    .sidebar.collapsed ~ .main { margin-left: var(--sidebar-collapsed); }
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .page-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .page-subtitle {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 18px;
+      background: var(--accent);
+      color: var(--white);
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+
+    .user-dropdown { position: relative; }
+    .user-dropdown-menu {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 100%;
+      background: var(--white);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      min-width: 120px;
+      z-index: 1000;
+      overflow: hidden;
+    }
+    .user-dropdown-menu.show { display: block; }
+    .user-dropdown-menu a {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 16px;
+      color: var(--text-primary);
+      text-decoration: none;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+    .user-dropdown-menu a:hover { background: #F3F4F6; }
+
+    {% block extra_css %}{% endblock %}
+  </style>
+</head>
+<body>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="logo">U</div>
+      <span class="brand-text">UniScan</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Main</div>
+      <div class="nav-item">
+        <a href="/tasks" class="{% if active_page == 'tasks' %}active{% endif %}">
+          <i class="bi bi-list-task"></i>
+          <span class="nav-label">检测任务</span>
+        </a>
+      </div>
+      <div class="nav-item">
+        <a href="/upload" class="{% if active_page == 'upload' %}active{% endif %}">
+          <i class="bi bi-cloud-upload"></i>
+          <span class="nav-label">数据上传</span>
+        </a>
+      </div>
+      <div class="nav-item">
+        <a href="/" class="{% if active_page == 'dashboard' %}active{% endif %}">
+          <i class="bi bi-speedometer2"></i>
+          <span class="nav-label">数据分析</span>
+        </a>
+      </div>
+      <div class="nav-section">系统</div>
+      <div class="nav-item">
+        <a href="/settings" class="{% if active_page == 'settings' %}active{% endif %}">
+          <i class="bi bi-gear"></i>
+          <span class="nav-label">系统设置</span>
+        </a>
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="btn-collapse" id="btnCollapse" title="Toggle sidebar">
+        <i class="bi bi-chevron-left" id="collapseIcon"></i>
+        <span>Collapse</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Topbar -->
+  <header class="topbar" id="topbar">
+    <div class="topbar-left">
+      <div class="breadcrumb">
+        <a href="/">UniScan</a>
+        <i class="bi bi-chevron-right" style="font-size:10px"></i>
+        <span class="current">{% block page_name %}数据分析{% endblock %}</span>
+      </div>
+    </div>
+  <div class="topbar-right">
+      <button class="topbar-btn" title="Search"><i class="bi bi-search"></i></button>
+      <button class="topbar-btn" title="Notifications">
+        <i class="bi bi-bell"></i>
+        <span class="badge-dot"></span>
+      </button>
+      <div class="topbar-divider"></div>
+      <div class="user-dropdown">
+        <div class="user-menu" onclick="toggleUserMenu()" style="cursor: pointer;">
+          <div class="user-avatar">A</div>
+          <div class="user-info">
+            <div class="user-name">Admin</div>
+            <div class="user-role">Administrator</div>
+          </div>
+          <i class="bi bi-chevron-down" style="font-size: 10px; margin-left: 4px;"></i>
+        </div>
+        <div class="user-dropdown-menu" id="userDropdownMenu">
+          <a href="#" onclick="logout(); return false;"><i class="bi bi-box-arrow-right"></i> 退出登录</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main" id="main">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    const sidebar = document.getElementById('sidebar');
+    const btnCollapse = document.getElementById('btnCollapse');
+    const collapseIcon = document.getElementById('collapseIcon');
+
+    btnCollapse.addEventListener('click', () => {
+      sidebar.classList.toggle('collapsed');
+      collapseIcon.className = sidebar.classList.contains('collapsed')
+        ? 'bi bi-chevron-right'
+        : 'bi bi-chevron-left';
+    });
+
+    function toggleUserMenu() {
+      const menu = document.getElementById('userDropdownMenu');
+      menu.classList.toggle('show');
+    }
+
+    // 点击其他地方关闭下拉菜单
+    document.addEventListener('click', (e) => {
+      const dropdown = document.querySelector('.user-dropdown');
+      if (!dropdown.contains(e.target)) {
+        document.getElementById('userDropdownMenu').classList.remove('show');
+      }
+    });
+
+    async function logout() {
+      try {
+        await fetch('/api/v1/auth/logout', {
+          method: 'POST',
+          credentials: 'same-origin'
+        });
+      } catch (e) {
+        console.error('Logout error:', e);
+      }
+      window.location.replace('/login');
+    }
+  </script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

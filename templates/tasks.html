@@ -1,0 +1,895 @@
+{% extends "base.html" %}
+{% set active_page = 'tasks' %}
+
+{% block title %}检测任务 - UniScan{% endblock %}
+{% block page_name %}检测任务{% endblock %}
+
+{% block extra_css %}
+<style>
+.tasks-page { padding: 0; }
+.toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 20px; flex-wrap: wrap; gap: 12px;
+}
+.toolbar-left { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 12px; align-items: center; }
+
+.filter-group { display: flex; align-items: center; gap: 8px; }
+.filter-label { font-size: 13px; color: #64748B; }
+.filter-select {
+  padding: 8px 12px; border: 1px solid #E2E8F0; border-radius: 6px;
+  font-size: 13px; outline: none; background: white;
+}
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+  border: none; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.btn-primary { background: #2D5BFF; color: white; }
+.btn-secondary { background: #F1F5F9; color: #1E293B; border: 1px solid #E2E8F0; }
+.btn-danger { background: #EF4444; color: white; }
+.btn-success { background: #10B981; color: white; }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+
+.view-toggle { display: flex; border: 1px solid #E2E8F0; border-radius: 6px; overflow: hidden; }
+.view-btn {
+  padding: 8px 12px; border: none; background: white; cursor: pointer;
+  font-size: 14px; color: #64748B;
+}
+.view-btn.active { background: #2D5BFF; color: white; }
+
+.stats-row { display: flex; gap: 16px; margin-bottom: 20px; }
+.mini-stat {
+  background: white; border-radius: 10px; padding: 14px 20px;
+  border: 1px solid #E2E8F0; display: flex; align-items: center; gap: 12px;
+}
+.mini-stat-icon {
+  width: 36px; height: 36px; border-radius: 8px; display: flex;
+  align-items: center; justify-content: center; font-size: 16px;
+}
+.mini-stat-icon.all { background: #DBEAFE; color: #2563EB; }
+.mini-stat-icon.processing { background: #FEF9C3; color: #854D0E; }
+.mini-stat-icon.done { background: #D1FAE5; color: #065F46; }
+.mini-stat-icon.failed { background: #FEE2E2; color: #991B1B; }
+.mini-stat-value { font-size: 20px; font-weight: 700; }
+.mini-stat-label { font-size: 12px; color: #64748B; }
+
+/* Edit Mode Bar */
+.edit-bar {
+  display: none; align-items: center; gap: 12px; padding: 12px 16px;
+  background: #EFF6FF; border-radius: 10px; margin-bottom: 16px;
+}
+.edit-bar.active { display: flex; }
+.edit-count { font-weight: 600; color: #2D5BFF; }
+
+/* Grid View */
+.task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.task-card {
+  background: white; border-radius: 12px; border: 1px solid #E2E8F0;
+  overflow: hidden; transition: all 0.2s; position: relative;
+}
+.task-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.task-card.selected { border-color: #2D5BFF; background: rgba(45,91,255,0.02); }
+.task-card-checkbox {
+  position: absolute; top: 14px; left: 14px; width: 20px; height: 20px;
+  cursor: pointer; z-index: 10; display: none;
+}
+.edit-mode .task-card-checkbox { display: block; }
+.task-card-header { padding: 14px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #F1F5F9; }
+.task-card-icon {
+  width: 40px; height: 40px; border-radius: 8px; display: flex;
+  align-items: center; justify-content: center; font-size: 18px;
+}
+.task-card-icon.image { background: #D1FAE5; color: #059669; }
+.task-card-icon.video { background: #DBEAFE; color: #2563EB; }
+.task-card-info { flex: 1; min-width: 0; }
+.task-card-title { font-weight: 600; font-size: 14px; }
+.task-card-meta { font-size: 12px; color: #94A3B8; margin-top: 2px; }
+.task-card-body { padding: 16px; }
+.task-card-progress { height: 6px; background: #E2E8F0; border-radius: 3px; margin-bottom: 12px; overflow: hidden; }
+.task-card-progress-bar { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.task-card-progress-bar.queued { background: #94A3B8; }
+.task-card-progress-bar.processing { background: #F59E0B; }
+.task-card-progress-bar.completed { background: #10B981; }
+.task-card-progress-bar.failed { background: #EF4444; }
+.task-card-stats { display: flex; gap: 16px; margin-bottom: 12px; font-size: 12px; color: #64748B; }
+.task-card-actions { display: flex; gap: 8px; }
+
+/* List View */
+.task-list { display: none; }
+.task-list.active { display: block; }
+.task-grid.hidden { display: none; }
+.task-row {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+  background: white; border-radius: 10px; margin-bottom: 8px;
+  border: 1px solid #E2E8F0; transition: all 0.2s;
+}
+.task-row:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.task-row.selected { border-color: #2D5BFF; background: rgba(45,91,255,0.02); }
+.task-row-checkbox { width: 18px; height: 18px; cursor: pointer; display: none; }
+.edit-mode .task-row-checkbox { display: block; }
+.task-row-icon {
+  width: 36px; height: 36px; border-radius: 8px; display: flex;
+  align-items: center; justify-content: center; font-size: 16px;
+}
+.task-row-info { flex: 1; min-width: 0; }
+.task-row-title { font-weight: 500; font-size: 14px; }
+.task-row-meta { font-size: 12px; color: #94A3B8; display: flex; gap: 16px; margin-top: 4px; }
+.task-row-progress { width: 120px; }
+.task-row-actions { display: flex; gap: 6px; }
+
+.status-badge { padding: 3px 10px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+.status-badge.queued { background: #F3F4F6; color: #6B7280; }
+.status-badge.processing { background: #FEF9C3; color: #854D0E; }
+.status-badge.completed { background: #D1FAE5; color: #065F46; }
+.status-badge.failed { background: #FEE2E2; color: #991B1B; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); display: none; align-items: center;
+  justify-content: center; z-index: 2000;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: white; border-radius: 16px; width: 90%; max-width: 1000px;
+  max-height: 90vh; overflow: hidden; display: flex; flex-direction: column;
+}
+.modal-header {
+  padding: 16px 20px; border-bottom: 1px solid #E2E8F0;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.modal-title { font-size: 18px; font-weight: 600; }
+.modal-close { width: 32px; height: 32px; border: none; background: none; cursor: pointer; font-size: 24px; }
+.modal-body { padding: 20px; overflow-y: auto; flex: 1; }
+
+.result-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+.result-tab {
+  padding: 8px 16px; border: 1px solid #E2E8F0; background: white;
+  border-radius: 6px; cursor: pointer; font-size: 13px;
+}
+.result-tab.active { background: #2D5BFF; color: white; border-color: #2D5BFF; }
+.result-content { display: none; }
+.result-content.active { display: block; }
+.result-image { width: 100%; max-height: 400px; object-fit: contain; border-radius: 8px; border: 1px solid #E2E8F0; }
+
+.detection-list { margin-top: 16px; }
+.detection-header { font-weight: 600; margin-bottom: 12px; }
+.detection-badge { background: #2D5BFF; color: white; padding: 2px 10px; border-radius: 10px; font-size: 12px; margin-left: 8px; }
+.detection-item {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  background: #F8FAFC; border-radius: 6px; margin-bottom: 4px;
+}
+.detection-num {
+  width: 24px; height: 24px; background: #2D5BFF; color: white;
+  border-radius: 50%; font-size: 11px; display: flex; align-items: center; justify-content: center;
+}
+.conf-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+.conf-high { background: #D1FAE5; color: #065F46; }
+.conf-mid { background: #FEF3C7; color: #92400E; }
+.conf-low { background: #FEE2E2; color: #991B1B; }
+
+.empty-state { text-align: center; padding: 60px; color: #94A3B8; }
+.empty-state i { font-size: 48px; margin-bottom: 16px; display: block; opacity: 0.4; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tasks-page">
+  <div class="stats-row">
+    <div class="mini-stat">
+      <div class="mini-stat-icon all"><i class="bi bi-list-task"></i></div>
+      <div><div class="mini-stat-value" id="stat-all">0</div><div class="mini-stat-label">全部</div></div>
+    </div>
+    <div class="mini-stat">
+      <div class="mini-stat-icon processing"><i class="bi bi-hourglass-split"></i></div>
+      <div><div class="mini-stat-value" id="stat-processing">0</div><div class="mini-stat-label">检测中</div></div>
+    </div>
+    <div class="mini-stat">
+      <div class="mini-stat-icon" style="background: #E0E7FF; color: #4F46E5;"><i class="bi bi-clock"></i></div>
+      <div><div class="mini-stat-value" id="stat-queued">0</div><div class="mini-stat-label">排队中</div></div>
+    </div>
+    <div class="mini-stat">
+      <div class="mini-stat-icon" style="background: #F3F4F6; color: #6B7280;"><i class="bi bi-pause-circle"></i></div>
+      <div><div class="mini-stat-value" id="stat-pending">0</div><div class="mini-stat-label">待检测</div></div>
+    </div>
+    <div class="mini-stat">
+      <div class="mini-stat-icon done"><i class="bi bi-check-circle"></i></div>
+      <div><div class="mini-stat-value" id="stat-done">0</div><div class="mini-stat-label">已完成</div></div>
+    </div>
+    <div class="mini-stat">
+      <div class="mini-stat-icon failed"><i class="bi bi-x-circle"></i></div>
+      <div><div class="mini-stat-value" id="stat-failed">0</div><div class="mini-stat-label">失败</div></div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <div class="filter-group">
+        <span class="filter-label">状态:</span>
+        <select class="filter-select" id="status-filter">
+          <option value="">全部</option>
+          <option value="pending">待检测</option>
+          <option value="queued">排队中</option>
+          <option value="processing">检测中</option>
+          <option value="completed">已完成</option>
+          <option value="failed">失败</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <span class="filter-label">类型:</span>
+        <select class="filter-select" id="type-filter">
+          <option value="">全部</option>
+          <option value="image">图片</option>
+          <option value="video">视频</option>
+        </select>
+      </div>
+    </div>
+    <div class="toolbar-right">
+      <button class="btn btn-primary" onclick="startAllPending()" id="btn-start-all" style="display:none"><i class="bi bi-play-fill"></i> 全部开始检测</button>
+      <button class="btn btn-secondary" onclick="stopAllProcessing()" id="btn-stop-all" style="display:none"><i class="bi bi-stop-fill"></i> 停止检测</button>
+      <div class="view-toggle">
+        <button class="view-btn" data-view="grid" title="卡片视图"><i class="bi bi-grid-3x3-gap"></i></button>
+        <button class="view-btn" data-view="list" title="列表视图"><i class="bi bi-list-ul"></i></button>
+      </div>
+      <button class="btn btn-secondary" onclick="loadTasks()"><i class="bi bi-arrow-clockwise"></i> 刷新</button>
+      <button class="btn btn-primary" onclick="enterEditMode()"><i class="bi bi-gear"></i> 管理</button>
+    </div>
+  </div>
+
+  <div class="edit-bar" id="edit-bar">
+    <input type="checkbox" id="select-all" onchange="toggleSelectAll()">
+    <span>已选择 <span class="edit-count" id="selected-count">0</span> 个任务</span>
+    <button class="btn btn-success btn-sm" onclick="restartSelected()"><i class="bi bi-arrow-clockwise"></i> 重新检测</button>
+    <button class="btn btn-secondary btn-sm" onclick="cancelSelected()"><i class="bi bi-stop"></i> 取消任务</button>
+    <button class="btn btn-danger btn-sm" onclick="deleteSelected()"><i class="bi bi-trash"></i> 删除选中</button>
+    <button class="btn btn-secondary btn-sm" onclick="exitEditMode()">退出管理</button>
+  </div>
+
+  <div class="task-grid" id="task-grid"></div>
+  <div class="task-list" id="task-list"></div>
+</div>
+
+<div class="modal-overlay" id="result-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">检测结果</span>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const VIEW_STORAGE_KEY = 'uniscan_tasks_view';
+let allTasks = [];
+let allUploads = [];
+let currentDisplayItems = []; // 新增：当前显示的任务列表
+let selectedTasks = new Set();
+let currentView = 'grid';
+let isEditMode = false;
+
+async function loadTasks() {
+  try {
+    const status = document.getElementById('status-filter').value;
+    const type = document.getElementById('type-filter').value;
+    
+    // 加载任务
+    const params = { page: 1, per_page: 100 };
+    if (status && status !== 'pending') params.status = status;
+    if (type) params.task_type = type;
+    
+    const [tasksResp, uploadsResp] = await Promise.all([
+      axios.get('/api/v1/detect/tasks', { params }),
+      axios.get('/api/v1/detect/uploads', { params: { page: 1, per_page: 100 } })
+    ]);
+    
+    if (tasksResp.data.code === 200) {
+      allTasks = tasksResp.data.data.items;
+    }
+    
+    if (uploadsResp.data.code === 200) {
+      allUploads = uploadsResp.data.data.items;
+    }
+    
+    // 获取已有任务的upload_id
+    const taskUploadIds = new Set(allTasks.map(t => t.source_id).filter(Boolean));
+    
+    // 找出待检测的上传记录
+    const pendingUploads = allUploads
+      .filter(u => !taskUploadIds.has(u.id))
+      .map(u => ({
+        id: `upload_${u.id}`,
+        upload_id: u.id,
+        task_type: u.file_type,
+        source_type: 'upload',
+        status: 'pending', // 待检测
+        progress: 0,
+        created_at: u.created_at,
+        file_name: u.file_name,
+        file_size: u.file_size,
+        isUpload: true
+      }));
+    
+    // 合并任务和待检测记录
+    let allItems = [...allTasks, ...pendingUploads];
+    
+    // 按状态筛选
+    if (status === 'pending') {
+      allItems = pendingUploads;
+    } else if (status) {
+      allItems = allItems.filter(t => t.status === status);
+    }
+    
+    // 保存当前显示的任务列表
+    currentDisplayItems = allItems;
+    
+    // 更新按钮显示状态
+    const hasPending = allItems.some(t => t.status === 'pending');
+    const hasProcessing = allItems.some(t => t.status === 'processing' || t.status === 'queued');
+    document.getElementById('btn-start-all').style.display = hasPending ? '' : 'none';
+    document.getElementById('btn-stop-all').style.display = hasProcessing ? '' : 'none';
+    
+    renderTasks(allItems);
+    updateStats(allItems);
+  } catch (e) { console.error(e); }
+}
+
+function updateStats(items) {
+  document.getElementById('stat-all').textContent = items.length;
+  document.getElementById('stat-processing').textContent = items.filter(t => t.status === 'processing').length;
+  document.getElementById('stat-queued').textContent = items.filter(t => t.status === 'queued').length;
+  document.getElementById('stat-pending').textContent = items.filter(t => t.status === 'pending').length;
+  document.getElementById('stat-done').textContent = items.filter(t => t.status === 'completed').length;
+  document.getElementById('stat-failed').textContent = items.filter(t => t.status === 'failed').length;
+}
+
+function renderTasks(items) {
+  const statusText = { 
+    pending: '待检测', 
+    queued: '排队中', 
+    processing: '检测中', 
+    completed: '已完成', 
+    failed: '失败', 
+    cancelled: '已取消' 
+  };
+  const typeText = { image: '图片', video: '视频' };
+
+  if (items.length === 0) {
+    const empty = '<div class="empty-state"><i class="bi bi-inbox"></i>暂无任务<br><span style="font-size:13px;">请先上传文件，然后点击"开始检测"</span></div>';
+    document.getElementById('task-grid').innerHTML = empty;
+    document.getElementById('task-list').innerHTML = empty;
+    return;
+  }
+
+  // 按时间排序
+  items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  // Grid view
+  let gridHtml = '';
+  items.forEach(task => {
+    const icon = task.task_type === 'image' ? 'bi-image' : 'bi-camera-video';
+    const iconClass = task.task_type === 'image' ? 'image' : 'video';
+    const time = new Date(task.created_at).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const progress = task.progress || 0;
+    const summary = task.result_summary || {};
+    const isSelected = selectedTasks.has(task.id);
+    const isPending = task.status === 'pending';
+    const isUpload = task.isUpload;
+
+    let actions = '';
+    if (isPending) {
+      actions += `<button class="btn btn-primary btn-sm" onclick="startDetect(${task.upload_id}, '${task.task_type}')"><i class="bi bi-play-fill"></i> 开始检测</button>`;
+    }
+    if (task.status === 'completed') {
+      actions += `<button class="btn btn-success btn-sm" onclick="viewResult(${task.id})"><i class="bi bi-eye"></i> 查看</button>`;
+    }
+    if (task.status === 'processing' || task.status === 'queued') {
+      actions += `<button class="btn btn-secondary btn-sm" onclick="cancelTask(${task.id})"><i class="bi bi-stop"></i> 取消</button>`;
+    }
+    if (!isUpload) {
+      actions += `<button class="btn btn-danger btn-sm" onclick="deleteTask(${task.id})"><i class="bi bi-trash"></i></button>`;
+    }
+
+    const displayName = isUpload ? task.file_name : `任务 #${task.id}`;
+    const statusBadge = statusText[task.status] || task.status;
+
+    gridHtml += `
+      <div class="task-card ${isSelected ? 'selected' : ''}" data-id="${task.id}">
+        <input type="checkbox" class="task-card-checkbox" ${isSelected ? 'checked' : ''} onchange="toggleSelect(${task.id})">
+        <div class="task-card-header">
+          <div class="task-card-icon ${iconClass}"><i class="bi ${icon}"></i></div>
+          <div class="task-card-info">
+            <div class="task-card-title">${displayName}</div>
+            <div class="task-card-meta">${time}</div>
+          </div>
+          <span class="status-badge status-${task.status}">${statusBadge}</span>
+        </div>
+        <div class="task-card-body">
+          ${!isPending ? `<div class="task-card-progress">
+            <div class="task-card-progress-bar ${task.status}" style="width: ${progress}%"></div>
+          </div>` : ''}
+          <div class="task-card-stats">
+            ${!isPending && progress > 0 ? `<span>进度: <strong>${progress}%</strong></span>` : ''}
+            ${summary.total_detections !== undefined ? `<span>检测: <strong>${summary.total_detections}</strong> 目标</span>` : ''}
+            ${isPending ? `<span style="color: #94A3B8;">等待开始检测</span>` : ''}
+          </div>
+          <div class="task-card-actions">${actions}</div>
+        </div>
+      </div>
+    `;
+  });
+  document.getElementById('task-grid').innerHTML = gridHtml;
+
+  // List view
+  let listHtml = '';
+  items.forEach(task => {
+    const icon = task.task_type === 'image' ? 'bi-image' : 'bi-camera-video';
+    const iconClass = task.task_type === 'image' ? 'image' : 'video';
+    const time = new Date(task.created_at).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    const progress = task.progress || 0;
+    const summary = task.result_summary || {};
+    const isSelected = selectedTasks.has(task.id);
+    const isPending = task.status === 'pending';
+    const isUpload = task.isUpload;
+
+    let actions = '';
+    if (isPending) {
+      actions += `<button class="btn btn-primary btn-sm" onclick="startDetect(${task.upload_id}, '${task.task_type}')"><i class="bi bi-play-fill"></i></button>`;
+    }
+    if (task.status === 'completed') {
+      actions += `<button class="btn btn-success btn-sm" onclick="viewResult(${task.id})"><i class="bi bi-eye"></i></button>`;
+    }
+    if (!isUpload) {
+      actions += `<button class="btn btn-danger btn-sm" onclick="deleteTask(${task.id})"><i class="bi bi-trash"></i></button>`;
+    }
+
+    const displayName = isUpload ? task.file_name : `任务 #${task.id}`;
+
+    listHtml += `
+      <div class="task-row ${isSelected ? 'selected' : ''}" data-id="${task.id}">
+        <input type="checkbox" class="task-row-checkbox" ${isSelected ? 'checked' : ''} onchange="toggleSelect(${task.id})">
+        <div class="task-row-icon ${iconClass}"><i class="bi ${icon}"></i></div>
+        <div class="task-row-info">
+          <div class="task-row-title">${displayName}</div>
+          <div class="task-row-meta">
+            <span>${typeText[task.task_type] || task.task_type}</span>
+            <span>${time}</span>
+            ${summary.total_detections !== undefined ? `<span>${summary.total_detections} 个目标</span>` : ''}
+          </div>
+        </div>
+        ${!isPending ? `<div class="task-row-progress">
+          <div class="task-card-progress" style="margin:0;">
+            <div class="task-card-progress-bar ${task.status}" style="width: ${progress}%"></div>
+          </div>
+        </div>` : '<div style="width:120px;"></div>'}
+        <span class="status-badge status-${task.status}">${statusText[task.status] || task.status}</span>
+        <div class="task-row-actions">${actions}</div>
+      </div>
+    `;
+  });
+  document.getElementById('task-list').innerHTML = listHtml;
+}
+
+// 开始检测
+async function startDetect(uploadId, fileType) {
+  try {
+    const resp = await axios.post('/api/v1/detect/task', {
+      source_type: 'upload',
+      source_id: uploadId,
+      task_type: fileType,
+      params: {}
+    });
+    if (resp.data.code === 200) {
+      loadTasks();
+    } else {
+      alert(resp.data.message || '创建任务失败');
+    }
+  } catch (e) {
+    alert('创建任务失败');
+  }
+}
+
+function enterEditMode() {
+  isEditMode = true;
+  selectedTasks.clear();
+  document.getElementById('edit-bar').classList.add('active');
+  document.getElementById('task-grid').classList.add('edit-mode');
+  document.getElementById('task-list').classList.add('edit-mode');
+  renderTasks(currentDisplayItems || []);
+}
+
+function exitEditMode() {
+  isEditMode = false;
+  selectedTasks.clear();
+  document.getElementById('edit-bar').classList.remove('active');
+  document.getElementById('task-grid').classList.remove('edit-mode');
+  document.getElementById('task-list').classList.remove('edit-mode');
+  document.getElementById('select-all').checked = false;
+  renderTasks(currentDisplayItems || []);
+}
+
+function toggleSelect(taskId) {
+  if (selectedTasks.has(taskId)) {
+    selectedTasks.delete(taskId);
+  } else {
+    selectedTasks.add(taskId);
+  }
+  updateSelectedCount();
+  renderTasks(currentDisplayItems || []);
+}
+
+function toggleSelectAll() {
+  const checked = document.getElementById('select-all').checked;
+  if (checked) {
+    // 选中所有任务（包括待检测的上传记录）
+    (currentDisplayItems || []).forEach(t => selectedTasks.add(t.id));
+  } else {
+    selectedTasks.clear();
+  }
+  updateSelectedCount();
+  renderTasks(currentDisplayItems || []);
+}
+
+function updateSelectedCount() {
+  document.getElementById('selected-count').textContent = selectedTasks.size;
+}
+
+async function restartSelected() {
+  if (selectedTasks.size === 0) {
+    alert('请先选择要重新检测的任务');
+    return;
+  }
+  
+  // 获取选中的任务（不是上传记录）
+  const selectedTasksList = currentDisplayItems.filter(t => selectedTasks.has(t.id) && !t.isUpload);
+  const restartable = selectedTasksList.filter(t => t.status === 'completed' || t.status === 'failed');
+  
+  if (restartable.length === 0) {
+    alert('选中的任务中没有可以重新检测的（只有已完成或失败的任务可以重新检测）');
+    return;
+  }
+  
+  if (!confirm(`确定重新检测 ${restartable.length} 个任务？`)) return;
+  
+  try {
+    for (const task of restartable) {
+      await axios.post('/api/v1/detect/task', {
+        source_type: task.source_type,
+        source_id: task.source_id,
+        task_type: task.task_type,
+        scene_id: task.scene_id,
+        params: task.params
+      });
+    }
+    exitEditMode();
+    loadTasks();
+    alert(`已创建 ${restartable.length} 个新检测任务`);
+  } catch (e) {
+    console.error('Restart error:', e);
+    alert('重新检测失败: ' + (e.response?.data?.message || e.message));
+  }
+}
+
+async function cancelSelected() {
+  if (selectedTasks.size === 0) {
+    alert('请先选择要取消的任务');
+    return;
+  }
+  
+  const selectedTasksList = currentDisplayItems.filter(t => selectedTasks.has(t.id) && !t.isUpload);
+  const cancellable = selectedTasksList.filter(t => t.status === 'queued' || t.status === 'processing');
+  
+  if (cancellable.length === 0) {
+    alert('选中的任务中没有可以取消的');
+    return;
+  }
+  
+  if (!confirm(`确定取消 ${cancellable.length} 个任务？`)) return;
+  
+  try {
+    for (const task of cancellable) {
+      await axios.post(`/api/v1/detect/tasks/${task.id}/cancel`);
+    }
+    exitEditMode();
+    loadTasks();
+    alert(`已取消 ${cancellable.length} 个任务`);
+  } catch (e) {
+    console.error('Cancel error:', e);
+    alert('取消失败: ' + (e.response?.data?.message || e.message));
+  }
+}
+
+async function deleteSelected() {
+  if (selectedTasks.size === 0) {
+    alert('请先选择要删除的任务');
+    return;
+  }
+  if (!confirm(`确定删除选中的 ${selectedTasks.size} 个项目？`)) return;
+  
+  try {
+    let deletedCount = 0;
+    
+    // 分离任务ID和上传记录ID
+    const taskIds = [];
+    const uploadIds = [];
+    
+    selectedTasks.forEach(id => {
+      const idStr = String(id);
+      if (idStr.startsWith('upload_')) {
+        uploadIds.push(parseInt(idStr.replace('upload_', '')));
+      } else {
+        taskIds.push(id);
+      }
+    });
+    
+    // 删除真正的任务
+    for (const id of taskIds) {
+      const resp = await axios.delete(`/api/v1/detect/tasks/${id}`);
+      if (resp.data.code === 200) {
+        deletedCount++;
+      }
+    }
+    
+    // 删除上传记录（如果有）
+    if (uploadIds.length > 0) {
+      try {
+        await axios.delete('/api/v1/detect/uploads/clear');
+        deletedCount += uploadIds.length;
+      } catch (e) {
+        console.error('Delete uploads error:', e);
+      }
+    }
+    
+    exitEditMode();
+    loadTasks();
+    alert(`已删除 ${deletedCount} 个项目`);
+  } catch (e) { 
+    console.error('Delete error:', e);
+    alert('删除失败: ' + (e.response?.data?.message || e.message)); 
+  }
+}
+
+async function deleteTask(taskId) {
+  if (!taskId || String(taskId).startsWith('upload_')) {
+    alert('该记录无法删除');
+    return;
+  }
+  if (!confirm('确定删除该任务？')) return;
+  try { 
+    const resp = await axios.delete(`/api/v1/detect/tasks/${taskId}`); 
+    if (resp.data.code === 200) {
+      loadTasks(); 
+    } else {
+      alert('删除失败: ' + resp.data.message);
+    }
+  } catch (e) { 
+    console.error('Delete error:', e);
+    alert('删除失败: ' + (e.response?.data?.message || e.message)); 
+  }
+}
+
+async function cancelTask(taskId) {
+  if (!confirm('确定取消该任务？')) return;
+  try { await axios.post(`/api/v1/detect/tasks/${taskId}/cancel`); loadTasks(); } catch (e) { alert('取消失败'); }
+}
+
+async function viewResult(taskId) {
+  try {
+    const resp = await axios.get(`/api/v1/detect/tasks/${taskId}`);
+    if (resp.data.code === 200) {
+      const task = resp.data.data;
+      const summary = task.result_summary || {};
+      const results = task.results || [];
+      
+      let html = `
+        <div class="result-tabs">
+          <button class="result-tab active" onclick="switchTab(this, 'result')">检测结果</button>
+          <button class="result-tab" onclick="switchTab(this, 'details')">详细数据</button>
+        </div>
+        <div class="result-content active" id="tab-result">
+      `;
+
+      if (task.result_path) {
+        const path = task.result_path.replace(/\\/g, '/').split('/').pop();
+        if (task.task_type === 'video') {
+          html += `<video class="result-image" controls><source src="/api/v1/detect/result/${path}" type="video/mp4"></video>`;
+        } else {
+          html += `<img class="result-image" src="/api/v1/detect/result/${path}">`;
+        }
+      }
+
+      html += `<div style="background:#F0F9FF; padding:12px; border-radius:8px; margin:16px 0;">
+        <span>检测目标: <strong>${summary.total_detections || 0}</strong></span>
+      </div>`;
+
+      const dets = summary.detections || results.slice(0, 50);
+      html += `<div class="detection-list"><div class="detection-header">检测目标 <span class="detection-badge">${dets.length}</span></div>`;
+      dets.forEach((d, i) => {
+        const conf = ((d.confidence || 0) * 100).toFixed(1);
+        const confClass = conf >= 70 ? 'conf-high' : conf >= 40 ? 'conf-mid' : 'conf-low';
+        html += `<div class="detection-item">
+          <div class="detection-num">${i+1}</div>
+          <div style="flex:1; font-weight:500;">${d.class_name}</div>
+          <span class="conf-badge ${confClass}">${conf}%</span>
+        </div>`;
+      });
+      html += '</div></div>';
+
+      html += `<div class="result-content" id="tab-details" style="display:none;">
+        <div style="max-height:400px; overflow-y:auto;">
+          <table style="width:100%; border-collapse:collapse;">
+            <thead><tr style="background:#F8FAFC;">
+              <th style="padding:10px; text-align:left; font-size:12px;">#</th>
+              <th style="padding:10px; text-align:left; font-size:12px;">类别</th>
+              <th style="padding:10px; text-align:left; font-size:12px;">置信度</th>
+              ${task.task_type === 'video' ? '<th style="padding:10px; text-align:left; font-size:12px;">出现帧数</th>' : '<th style="padding:10px; text-align:left; font-size:12px;">坐标</th>'}
+            </tr></thead>
+            <tbody>`;
+      
+      if (task.task_type === 'video') {
+        // 视频：只显示不同类别，统计出现次数
+        const classMap = {};
+        results.forEach(r => {
+          if (!classMap[r.class_name] || classMap[r.class_name].confidence < r.confidence) {
+            classMap[r.class_name] = { confidence: r.confidence, count: (classMap[r.class_name]?.count || 0) + 1 };
+          } else {
+            classMap[r.class_name].count++;
+          }
+        });
+        
+        let i = 0;
+        for (const [className, data] of Object.entries(classMap)) {
+          i++;
+          html += `<tr style="border-bottom:1px solid #E2E8F0;">
+            <td style="padding:8px;">${i}</td>
+            <td style="padding:8px;">${className}</td>
+            <td style="padding:8px;">${(data.confidence * 100).toFixed(1)}%</td>
+            <td style="padding:8px;">${data.count} 帧</td>
+          </tr>`;
+        }
+      } else {
+        // 图片：显示所有检测结果
+        results.slice(0, 100).forEach((r, i) => {
+          html += `<tr style="border-bottom:1px solid #E2E8F0;">
+            <td style="padding:8px;">${i+1}</td>
+            <td style="padding:8px;">${r.class_name}</td>
+            <td style="padding:8px;">${((r.confidence || 0) * 100).toFixed(1)}%</td>
+            <td style="padding:8px;">(${r.bbox_x}, ${r.bbox_y}, ${r.bbox_w}, ${r.bbox_h})</td>
+          </tr>`;
+        });
+      }
+      html += '</tbody></table></div></div>';
+
+      document.getElementById('modal-title').textContent = `任务 #${taskId} 检测结果`;
+      document.getElementById('modal-body').innerHTML = html;
+      document.getElementById('result-modal').classList.add('show');
+    }
+  } catch (e) { alert('获取结果失败'); }
+}
+
+function switchTab(btn, tabName) {
+  btn.parentElement.querySelectorAll('.result-tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.result-content').forEach(c => { c.style.display = 'none'; c.classList.remove('active'); });
+  document.getElementById('tab-' + tabName).style.display = 'block';
+}
+
+function closeModal() { document.getElementById('result-modal').classList.remove('show'); }
+
+// View toggle with persistence
+function setView(view) {
+  currentView = view;
+  localStorage.setItem(VIEW_STORAGE_KEY, view);
+  
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.view-btn[data-view="${view}"]`).classList.add('active');
+  
+  if (view === 'grid') {
+    document.getElementById('task-grid').classList.remove('hidden');
+    document.getElementById('task-list').classList.remove('active');
+  } else {
+    document.getElementById('task-grid').classList.add('hidden');
+    document.getElementById('task-list').classList.add('active');
+  }
+}
+
+document.querySelectorAll('.view-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    setView(this.dataset.view);
+  });
+});
+
+// Start/Stop all processing
+async function startAllPending() {
+  // 获取所有待检测的上传记录
+  const taskUploadIds = new Set(allTasks.map(t => t.source_id).filter(Boolean));
+  const pendingUploads = allUploads.filter(u => !taskUploadIds.has(u.id));
+  
+  if (pendingUploads.length === 0) {
+    alert('没有待检测的文件');
+    return;
+  }
+  
+  if (!confirm(`确定开始检测 ${pendingUploads.length} 个文件？`)) return;
+  
+  try {
+    for (const upload of pendingUploads) {
+      await axios.post('/api/v1/detect/task', {
+        source_type: 'upload',
+        source_id: upload.id,
+        task_type: upload.file_type,
+        params: {}
+      });
+    }
+    loadTasks();
+    alert(`已创建 ${pendingUploads.length} 个检测任务`);
+  } catch (e) {
+    console.error('Start error:', e);
+    alert('创建任务失败');
+  }
+}
+
+async function stopAllProcessing() {
+  const processingTasks = allTasks.filter(t => t.status === 'processing' || t.status === 'queued');
+  if (processingTasks.length === 0) {
+    alert('没有正在处理的任务');
+    return;
+  }
+  
+  if (!confirm(`确定停止 ${processingTasks.length} 个任务？`)) return;
+  
+  try {
+    // 调用批量取消 API
+    const resp = await axios.post('/api/v1/detect/tasks/cancel-all');
+    if (resp.data.code === 200) {
+      loadTasks();
+      alert(resp.data.message || '已停止所有任务');
+    } else {
+      alert('停止失败: ' + resp.data.message);
+    }
+  } catch (e) {
+    alert('停止失败');
+  }
+}
+
+async function clearAllTasks() {
+  if (allTasks.length === 0) {
+    alert('没有任务需要清空');
+    return;
+  }
+  
+  if (!confirm(`确定清空所有 ${allTasks.length} 个检测任务？此操作不可恢复！`)) return;
+  
+  try {
+    const resp = await axios.delete('/api/v1/detect/tasks/clear');
+    if (resp.data.code === 200) {
+      loadTasks();
+      alert(resp.data.message);
+    } else {
+      alert('清空失败: ' + resp.data.message);
+    }
+  } catch (e) {
+    console.error('Clear error:', e);
+    alert('清空失败: ' + (e.response?.data?.message || e.message));
+  }
+}
+
+// Restore view on load
+function restoreView() {
+  const savedView = localStorage.getItem(VIEW_STORAGE_KEY) || 'grid';
+  setView(savedView);
+}
+
+document.getElementById('status-filter').addEventListener('change', loadTasks);
+document.getElementById('type-filter').addEventListener('change', loadTasks);
+
+restoreView();
+loadTasks();
+setInterval(() => {
+  if (allTasks.some(t => t.status === 'processing' || t.status === 'queued')) loadTasks();
+}, 5000);
+</script>
+{% endblock %}
