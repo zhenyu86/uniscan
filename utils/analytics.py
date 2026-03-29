@@ -131,27 +131,50 @@ class AnalyticsEngine:
     @staticmethod
     def get_alert_trend(days=7, alert_categories=None):
         """
-        获取告警趋势（按告警级别分组）
+        获取告警趋势（按配置的告警类别统计检测结果）
 
         Args:
             days: 天数
-            alert_categories: 告警类别列表（此参数不再使用，保留兼容性）
+            alert_categories: 告警类别列表（可选）
 
         Returns:
             list: 趋势数据
         """
         start_date = datetime.now() - timedelta(days=days)
 
-        # 从告警表中统计各级别的数量
+        # 如果没有传入告警类别，从数据库获取
+        if not alert_categories:
+            from models.config import SystemConfig
+            config = SystemConfig.query.filter_by(config_key='alert_categories').first()
+            if config and config.config_value:
+                try:
+                    alert_categories = json.loads(config.config_value)
+                except:
+                    alert_categories = []
+        
+        # 如果没有配置告警类别，返回空列表
+        if not alert_categories:
+            return []
+        
+        # 获取启用的类别名称
+        enabled_categories = [cat['name'] for cat in alert_categories if cat.get('enabled', True)]
+        
+        if not enabled_categories:
+            return []
+
+        # 从检测结果表中统计各类别的数量
         results = db.session.query(
-            func.date(Alert.created_at).label('date'),
-            Alert.level,
-            func.count(Alert.id).label('count')
+            func.date(DetectionResult.created_at).label('date'),
+            DetectionResult.class_name,
+            func.count(DetectionResult.id).label('count')
         ).filter(
-            Alert.created_at >= start_date
+            and_(
+                DetectionResult.created_at >= start_date,
+                DetectionResult.class_name.in_(enabled_categories)
+            )
         ).group_by(
-            func.date(Alert.created_at),
-            Alert.level
+            func.date(DetectionResult.created_at),
+            DetectionResult.class_name
         ).order_by('date').all()
 
         # 如果没有数据，返回空列表
@@ -163,8 +186,11 @@ class AnalyticsEngine:
         for r in results:
             date_str = r.date.strftime('%Y-%m-%d')
             if date_str not in trend_data:
-                trend_data[date_str] = {'date': date_str, 'warning': 0, 'info': 0, 'error': 0, 'critical': 0}
-            trend_data[date_str][r.level] = r.count
+                trend_data[date_str] = {'date': date_str}
+                # 初始化所有启用的类别为0
+                for cat in enabled_categories:
+                    trend_data[date_str][cat] = 0
+            trend_data[date_str][r.class_name] = r.count
 
         return list(trend_data.values())
 

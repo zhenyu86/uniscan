@@ -59,16 +59,7 @@ def get_class_distribution():
 def get_alert_trend():
     """获取告警趋势"""
     days = request.args.get('days', 7, type=int)
-    categories_str = request.args.get('categories')
-    
-    alert_categories = None
-    if categories_str:
-        try:
-            alert_categories = json.loads(categories_str)
-        except:
-            alert_categories = None
-    
-    trend = AnalyticsEngine.get_alert_trend(days, alert_categories)
+    trend = AnalyticsEngine.get_alert_trend(days)
 
     return jsonify({
         'code': 200,

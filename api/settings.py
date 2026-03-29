@@ -61,39 +61,49 @@ def get_users():
 @admin_required
 def create_user():
     """创建用户"""
-    data = request.get_json()
-    username = data.get('username', '').strip()
-    password = data.get('password', '')
+    try:
+        data = request.get_json()
+        username = data.get('username', '').strip()
+        password = data.get('password', '')
+        role = data.get('role', 'user')
 
-    if not username or not password:
-        return jsonify({'code': 400, 'message': '用户名和密码不能为空', 'data': None})
+        if not username or not password:
+            return jsonify({'code': 400, 'message': '用户名和密码不能为空', 'data': None})
 
-    if len(password) < 6:
-        return jsonify({'code': 400, 'message': '密码长度不能少于6位', 'data': None})
+        if len(password) < 6:
+            return jsonify({'code': 400, 'message': '密码长度不能少于6位', 'data': None})
 
-    # 检查用户名是否存在
-    if User.query.filter_by(username=username).first():
-        return jsonify({'code': 400, 'message': '用户名已存在', 'data': None})
+        # 检查用户名是否存在
+        if User.query.filter_by(username=username).first():
+            return jsonify({'code': 400, 'message': '用户名已存在', 'data': None})
 
-    user = User(
-        username=username,
-        email=data.get('email'),
-        real_name=data.get('real_name'),
-        role=data.get('role', 'viewer'),
-        status=data.get('status', 1)
-    )
-    user.set_password(password)
+        # 确保角色有效
+        if role not in ['admin', 'user']:
+            role = 'user'
 
-    db.session.add(user)
-    db.session.commit()
+        user = User(
+            username=username,
+            email=data.get('email'),
+            real_name=data.get('real_name'),
+            role=role,
+            status=data.get('status', 1)
+        )
+        user.set_password(password)
 
-    log_operation(current_user.id, 'create_user', f'创建用户: {username}')
+        db.session.add(user)
+        db.session.commit()
 
-    return jsonify({
-        'code': 200,
-        'message': '创建成功',
-        'data': user.to_dict()
-    })
+        log_operation(current_user.id, 'create_user', f'创建用户: {username}')
+
+        return jsonify({
+            'code': 200,
+            'message': '创建成功',
+            'data': user.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        print(f"创建用户失败: {e}")
+        return jsonify({'code': 500, 'message': f'创建失败: {str(e)}', 'data': None})
 
 
 @settings_bp.route('/users/<int:user_id>', methods=['GET'])

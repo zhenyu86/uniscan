@@ -19,6 +19,7 @@ from utils.detector_engine import DetectorEngine
 from utils.alert_manager import AlertManager
 from utils.rule_engine import RuleEngine
 from models.rule import AlertRule
+from detector_config import CONFIDENCE_THRESHOLD, IOU_THRESHOLD
 
 detect_bp = Blueprint('detect', __name__, url_prefix='/api/v1/detect')
 
@@ -449,11 +450,11 @@ def quick_detect():
     file.save(filepath)
 
     # 获取检测参数
-    confidence = float(request.form.get('confidence', 0.5))
-    iou_threshold = float(request.form.get('iou_threshold', 0.45))
+    confidence = float(request.form.get('confidence', CONFIDENCE_THRESHOLD))
+    iou_threshold = float(request.form.get('iou_threshold', IOU_THRESHOLD))
 
     # 执行检测
-    engine = DetectorEngine(current_app.config['MODEL_PATH'])
+    engine = DetectorEngine(model_type='onnx', model_path=current_app.config['MODEL_PATH'])
     result = engine.detect_image(filepath, {
         'confidence': confidence,
         'iou_threshold': iou_threshold

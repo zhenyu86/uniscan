@@ -53,6 +53,17 @@ def init_tables(app):
     with app.app_context():
         try:
             db.create_all()
+            
+            # 修改 users 表的 role 字段从 Enum 改为 VARCHAR
+            try:
+                from sqlalchemy import text
+                with db.engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE users MODIFY COLUMN role VARCHAR(20) NOT NULL DEFAULT 'user'"))
+                    conn.commit()
+                print("[OK] 已更新 users 表 role 字段类型")
+            except Exception as e:
+                print(f"[INFO] role 字段更新跳过: {e}")
+            
             print("[OK] 数据库表已创建")
             return True
         except Exception as e:
@@ -67,6 +78,17 @@ def init_default_data(app):
 
     with app.app_context():
         try:
+            # 更新旧角色到新角色
+            try:
+                User.query.filter(User.role.in_(['manager', 'operator', 'viewer'])).update(
+                    {'role': 'user'}, synchronize_session=False
+                )
+                db.session.commit()
+                print("[OK] 已更新旧角色数据")
+            except Exception as e:
+                db.session.rollback()
+                print(f"[INFO] 角色更新跳过: {e}")
+            
             # 确保默认用户存在（无论数据库是否已有数据）
             for user_cfg in app.config['DEFAULT_USERS']:
                 existing_user = User.query.filter_by(username=user_cfg['username']).first()
@@ -84,9 +106,12 @@ def init_default_data(app):
                     db.session.add(user)
                     print(f"[OK] 创建用户: {user_cfg['username']}")
                 else:
+                    # 更新角色（如果需要）
+                    if existing_user.role not in ['admin', 'user']:
+                        existing_user.role = 'user'
                     # 确保密码正确（重置密码）
                     existing_user.set_password(user_cfg['password'])
-                    print(f"[OK] 重置密码: {user_cfg['username']}")
+                    print(f"[OK] 更新用户: {user_cfg['username']}")
             db.session.commit()
             print("[OK] 用户数据已就绪")
 

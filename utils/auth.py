@@ -120,9 +120,7 @@ def check_permission(user, permission):
     # 权限映射
     permission_map = {
         'admin': ['all'],
-        'manager': ['view', 'detect', 'alert', 'scene', 'rule', 'analytics'],
-        'operator': ['view', 'detect', 'alert'],
-        'viewer': ['view']
+        'user': ['view', 'detect', 'alert', 'scene', 'rule', 'analytics']
     }
 
     user_permissions = permission_map.get(user.role, [])

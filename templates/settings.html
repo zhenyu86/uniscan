@@ -114,9 +114,13 @@ tr:hover td { background: #F8FAFC; }
   <div class="tabs">
     <button class="tab-btn active" data-tab="detection"><i class="bi bi-sliders"></i> 检测参数</button>
     <button class="tab-btn" data-tab="alerts"><i class="bi bi-bell"></i> 告警设置</button>
+    {% if current_user.role == 'admin' %}
     <button class="tab-btn" data-tab="users"><i class="bi bi-people"></i> 用户管理</button>
+    {% endif %}
     <button class="tab-btn" data-tab="system"><i class="bi bi-gear"></i> 系统配置</button>
+    {% if current_user.role == 'admin' %}
     <button class="tab-btn" data-tab="logs"><i class="bi bi-clock-history"></i> 操作日志</button>
+    {% endif %}
   </div>
 
   <!-- 检测参数配置 -->
@@ -352,7 +356,8 @@ tr:hover td { background: #F8FAFC; }
       </div>
       <div class="form-group">
         <label class="form-label">密码</label>
-        <input type="password" class="form-input" id="new-password" placeholder="请输入密码">
+        <input type="password" class="form-input" id="new-password" placeholder="请输入密码（至少6位）" minlength="6">
+        <div class="form-hint">密码长度不能少于6位</div>
       </div>
       <div class="form-group">
         <label class="form-label">姓名</label>
@@ -365,10 +370,8 @@ tr:hover td { background: #F8FAFC; }
       <div class="form-group">
         <label class="form-label">角色</label>
         <select class="form-input" id="new-role">
-          <option value="viewer">查看者</option>
-          <option value="operator">操作员</option>
-          <option value="manager">管理员</option>
-          <option value="admin">超级管理员</option>
+          <option value="user">普通用户</option>
+          <option value="admin">管理员</option>
         </select>
       </div>
     </div>
@@ -402,7 +405,14 @@ function switchTab(tabName) {
 
 // Restore last selected tab
 function restoreTab() {
-  const lastTab = localStorage.getItem(TAB_STORAGE_KEY) || 'detection';
+  let lastTab = localStorage.getItem(TAB_STORAGE_KEY) || 'detection';
+  
+  // 检查标签是否存在（普通用户没有 users 和 logs 标签）
+  const tabBtn = document.querySelector(`.tab-btn[data-tab="${lastTab}"]`);
+  if (!tabBtn) {
+    lastTab = 'detection';
+  }
+  
   switchTab(lastTab);
 }
 
@@ -467,8 +477,8 @@ async function loadUsers() {
       const users = resp.data.data.items;
       let html = '';
       users.forEach(u => {
-        const roleBadge = { admin: 'badge-admin', manager: 'badge-manager', operator: 'badge-operator', viewer: 'badge-viewer' };
-        const roleText = { admin: '超级管理员', manager: '管理员', operator: '操作员', viewer: '查看者' };
+        const roleBadge = { admin: 'badge-admin', user: 'badge-user' };
+        const roleText = { admin: '管理员', user: '普通用户' };
         html += `
           <tr>
             <td>${u.username}</td>
@@ -602,24 +612,41 @@ function closeModal(id) {
 }
 
 async function addUser() {
-  const data = {
-    username: document.getElementById('new-username').value,
-    password: document.getElementById('new-password').value,
-    real_name: document.getElementById('new-realname').value,
-    email: document.getElementById('new-email').value,
-    role: document.getElementById('new-role').value
-  };
+  const username = document.getElementById('new-username').value.trim();
+  const password = document.getElementById('new-password').value;
+  const real_name = document.getElementById('new-realname').value.trim();
+  const email = document.getElementById('new-email').value.trim();
+  const role = document.getElementById('new-role').value;
+
+  // 前端验证
+  if (!username) {
+    alert('请输入用户名');
+    return;
+  }
+  if (!password || password.length < 6) {
+    alert('密码长度不能少于6位');
+    return;
+  }
+
+  const data = { username, password, real_name, email, role };
+  
   try {
     const resp = await axios.post('/api/v1/settings/users', data);
     if (resp.data.code === 200) {
       alert('添加成功');
       closeModal('add-user-modal');
+      // 清空表单
+      document.getElementById('new-username').value = '';
+      document.getElementById('new-password').value = '';
+      document.getElementById('new-realname').value = '';
+      document.getElementById('new-email').value = '';
       loadUsers();
     } else {
-      alert(resp.data.message);
+      alert('添加失败: ' + resp.data.message);
     }
   } catch (e) {
-    alert('添加失败');
+    console.error('Add user error:', e);
+    alert('添加失败: ' + (e.response?.data?.message || e.message));
   }
 }
 

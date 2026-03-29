@@ -18,8 +18,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(100), nullable=True)
     real_name = db.Column(db.String(50), nullable=True)
-    role = db.Column(db.Enum('admin', 'manager', 'operator', 'viewer'),
-                     nullable=False, default='viewer')
+    role = db.Column(db.String(20), nullable=False, default='user')
     avatar = db.Column(db.String(255), nullable=True)
     status = db.Column(db.SmallInteger, nullable=False, default=1)
     last_login = db.Column(db.DateTime, nullable=True)

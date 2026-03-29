@@ -72,12 +72,20 @@ class TaskExecutor:
                 db.session.commit()
                 print(f"任务 {task_id} 开始执行")
 
-                model_path = self.app.config.get('MODEL_PATH', 'weights/best.onnx')
-                engine = DetectorEngine(model_path)
+                # 从检测器配置获取模型参数
+                from detector_config import (
+                    MODEL_PATH as CONFIG_MODEL_PATH,
+                    CONFIDENCE_THRESHOLD,
+                    IOU_THRESHOLD,
+                    DEFAULT_FRAME_STEP
+                )
+                
+                model_path = self.app.config.get('MODEL_PATH', CONFIG_MODEL_PATH)
+                engine = DetectorEngine(model_type='onnx', model_path=model_path)
 
                 params = task.params or {}
-                confidence = params.get('confidence', 0.5)
-                iou_threshold = params.get('iou_threshold', 0.45)
+                confidence = params.get('confidence', CONFIDENCE_THRESHOLD)
+                iou_threshold = params.get('iou_threshold', IOU_THRESHOLD)
 
                 if task.source_type == 'upload':
                     record = UploadRecord.query.get(task.source_id)
@@ -109,7 +117,7 @@ class TaskExecutor:
                         db.session.rollback()
                     return True
 
-                frame_step = params.get('frame_step', 10)
+                frame_step = params.get('frame_step', DEFAULT_FRAME_STEP)
 
                 # 检查是否被取消
                 if self.is_task_cancelled(task_id):

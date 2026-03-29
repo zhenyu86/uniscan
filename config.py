@@ -64,8 +64,7 @@ class Config:
     # ==================== 默认用户账户 ====================
     DEFAULT_USERS = [
         {'username': 'admin', 'password': 'admin123', 'role': 'admin', 'name': '系统管理员'},
-        {'username': 'operator', 'password': 'operator123', 'role': 'operator', 'name': '操作员'},
-        {'username': 'viewer', 'password': 'viewer123', 'role': 'viewer', 'name': '查看者'}
+        {'username': 'user', 'password': 'user123', 'role': 'user', 'name': '普通用户'}
     ]
 
     # ==================== COCO 80类标签 ====================

@@ -372,10 +372,10 @@
       <div class="topbar-divider"></div>
       <div class="user-dropdown">
         <div class="user-menu" onclick="toggleUserMenu()" style="cursor: pointer;">
-          <div class="user-avatar">A</div>
+          <div class="user-avatar">{{ current_user.username[0]|upper if current_user.is_authenticated else 'U' }}</div>
           <div class="user-info">
-            <div class="user-name">Admin</div>
-            <div class="user-role">Administrator</div>
+            <div class="user-name">{{ current_user.username if current_user.is_authenticated else '用户' }}</div>
+            <div class="user-role">{{ '管理员' if current_user.role == 'admin' else '普通用户' }}</div>
           </div>
           <i class="bi bi-chevron-down" style="font-size: 10px; margin-left: 4px;"></i>
         </div>

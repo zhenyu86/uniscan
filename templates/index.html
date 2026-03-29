@@ -324,15 +324,19 @@
   async function loadAlertChart() {
     const chart = echarts.init(document.getElementById('alert-chart'));
     try {
-      const resp = await axios.get('/api/v1/analytics/alert-trend', { 
-        params: { 
-          days: alertDays
-        } 
-      });
+      // 先获取告警类别配置
+      let alertCategories = [];
+      try {
+        const configResp = await axios.get('/api/v1/settings/configs/alert_categories');
+        if (configResp.data.code === 200 && configResp.data.data && configResp.data.data.config_value) {
+          alertCategories = JSON.parse(configResp.data.data.config_value);
+        }
+      } catch (e) {}
+
+      // 获取启用的类别
+      const enabledCategories = alertCategories.filter(c => c.enabled !== false);
       
-      // 检查响应是否有数据
-      if (resp.data.code !== 200 || !resp.data.data || resp.data.data.length === 0) {
-        // 无数据时显示空图表
+      if (enabledCategories.length === 0) {
         chart.setOption({
           tooltip: { trigger: 'axis' },
           grid: { left: 40, right: 20, top: 20, bottom: 40 },
@@ -344,7 +348,35 @@
             left: 'center',
             top: 'middle',
             style: {
-              text: '暂无告警数据',
+              text: '请先在系统设置中添加告警类别',
+              fontSize: 14,
+              fill: '#94A3B8'
+            }
+          }
+        });
+        return;
+      }
+
+      const resp = await axios.get('/api/v1/analytics/alert-trend', { 
+        params: { 
+          days: alertDays
+        } 
+      });
+      
+      // 检查响应是否有数据
+      if (resp.data.code !== 200 || !resp.data.data || resp.data.data.length === 0) {
+        chart.setOption({
+          tooltip: { trigger: 'axis' },
+          grid: { left: 40, right: 20, top: 20, bottom: 40 },
+          xAxis: { type: 'category', data: [] },
+          yAxis: { type: 'value' },
+          series: [],
+          graphic: {
+            type: 'text',
+            left: 'center',
+            top: 'middle',
+            style: {
+              text: '暂无检测数据',
               fontSize: 14,
               fill: '#94A3B8'
             }
@@ -353,32 +385,38 @@
         return;
       }
       
-      let dates = [], warnings = [], infos = [], errors = [], criticals = [];
+      let dates = [];
+      const seriesData = {};
+      enabledCategories.forEach(cat => {
+        seriesData[cat.name] = [];
+      });
       
       resp.data.data.forEach(item => {
         dates.push(item.date);
-        warnings.push(item.warning || 0);
-        infos.push(item.info || 0);
-        errors.push(item.error || 0);
-        criticals.push(item.critical || 0);
+        enabledCategories.forEach(cat => {
+          seriesData[cat.name].push(item[cat.name] || 0);
+        });
       });
+      
+      const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316'];
+      const series = enabledCategories.map((cat, i) => ({
+        name: cat.name,
+        type: 'bar',
+        stack: 'alert',
+        data: seriesData[cat.name],
+        itemStyle: { color: cat.color || colors[i % colors.length] }
+      }));
       
       chart.setOption({
         tooltip: { trigger: 'axis' },
-        legend: { data: ['提示', '一般', '重要', '紧急'], bottom: 0 },
+        legend: { data: enabledCategories.map(c => c.name), bottom: 0 },
         grid: { left: 40, right: 20, top: 20, bottom: 40 },
         xAxis: { type: 'category', data: dates },
         yAxis: { type: 'value' },
-        series: [
-          { name: '提示', type: 'bar', stack: 'alert', data: infos, itemStyle: { color: '#3B82F6' } },
-          { name: '一般', type: 'bar', stack: 'alert', data: warnings, itemStyle: { color: '#F59E0B' } },
-          { name: '重要', type: 'bar', stack: 'alert', data: errors, itemStyle: { color: '#EF4444' } },
-          { name: '紧急', type: 'bar', stack: 'alert', data: criticals, itemStyle: { color: '#DC2626' } }
-        ]
+        series: series
       });
     } catch (e) {
       console.error('Load alert chart error:', e);
-      // 出错时显示空图表
       chart.setOption({
         tooltip: { trigger: 'axis' },
         grid: { left: 40, right: 20, top: 20, bottom: 40 },
